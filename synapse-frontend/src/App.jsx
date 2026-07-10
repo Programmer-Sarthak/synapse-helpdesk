@@ -3,6 +3,9 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import CreateTicket from "./pages/CreateTicket";
+import axios from "axios";
+
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 
 function App() {
   return (
