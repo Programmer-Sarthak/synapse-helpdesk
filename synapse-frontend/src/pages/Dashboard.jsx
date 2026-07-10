@@ -22,8 +22,8 @@ export default function Dashboard() {
 
       // Fetch both the user profile AND the tickets at the same time
       const [userResponse, ticketsResponse] = await Promise.all([
-        axios.get("http://localhost:8080/api/users/me", { headers }),
-        axios.get("http://localhost:8080/api/tickets", { headers })
+        axios.get("/api/users/me", { headers }),
+        axios.get("/api/tickets", { headers })
       ]);
       
       setCurrentUser(userResponse.data);
@@ -37,7 +37,7 @@ export default function Dashboard() {
   const handleAction = async (ticketId, action) => {
     try {
       const token = localStorage.getItem("jwt_token");
-      await axios.put(`http://localhost:8080/api/tickets/${ticketId}/${action}`, {}, {
+      await axios.put(`/api/tickets/${ticketId}/${action}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchData();

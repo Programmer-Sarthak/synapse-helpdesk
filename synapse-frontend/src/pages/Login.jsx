@@ -13,7 +13,7 @@ export default function Login() {
     setError("");
 
     try {
-      const response = await axios.post("http://localhost:8080/api/users/login", {
+      const response = await axios.post("/api/users/login", {
         email: email,
         password: password
       });

@@ -16,7 +16,7 @@ export default function CreateTicket() {
       const token = localStorage.getItem("jwt_token");
       
       await axios.post(
-        "http://localhost:8080/api/tickets",
+        "/api/tickets",
         { title, description },
         { headers: { Authorization: `Bearer ${token}` } }
       );
