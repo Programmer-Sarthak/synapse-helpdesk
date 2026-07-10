@@ -1,0 +1,33 @@
+# =========================
+# BACKEND (Spring Boot / Java)
+# =========================
+synapse-backend/target/
+synapse-backend/*.jar
+synapse-backend/*.war
+synapse-backend/.mvn/wrapper/maven-wrapper.jar
+
+# =========================
+# FRONTEND (React / Vite)
+# =========================
+synapse-frontend/node_modules/
+synapse-frontend/dist/
+synapse-frontend/dist-ssr/
+synapse-frontend/*.local
+
+# =========================
+# SECURITY & SECRETS
+# =========================
+.env
+*.env
+.env.*
+secrets.properties
+application-dev.properties
+
+# =========================
+# IDE & OS SPAM (Do not push your personal settings)
+# =========================
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
