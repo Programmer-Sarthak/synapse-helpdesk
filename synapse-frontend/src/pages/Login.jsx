@@ -11,6 +11,9 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+
+    console.log("Axios Base URL is:", axios.defaults.baseURL);
+    console.log("Attempting to login with:", email);
     
     try {
       const response = await axios.post("/api/users/login", {
