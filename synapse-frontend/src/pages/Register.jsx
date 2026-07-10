@@ -15,7 +15,7 @@ export default function Register() {
 
     try {
       // Hit your backend registration endpoint
-      await axios.post("http://localhost:8080/api/users/register", {
+      await axios.post("/api/users/register", {
         name,
         email,
         password
