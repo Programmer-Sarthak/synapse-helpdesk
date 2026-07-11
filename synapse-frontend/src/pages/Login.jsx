@@ -85,7 +85,15 @@ export default function Login() {
           <Link to="/register" className="text-blue-600 hover:text-blue-500 font-medium">Sign up</Link>
         </div>
 
+        <div className="mt-6 text-center text-sm">
+          <span className="mt-2 text-sm text-gray-600">
+            E-mail: vikram.singh@synapse.in <br/>
+            Password: password123 
+          </span>
+      </div>
+
       </div>
     </div>
+    
   );
 }
