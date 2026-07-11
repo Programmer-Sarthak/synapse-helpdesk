@@ -27,6 +27,8 @@ export default function Dashboard() {
       
       setCurrentUser(userResponse.data);
       setTickets(ticketsResponse.data);
+
+
       
       // Set the default tab based on their role
       if (!view) {
