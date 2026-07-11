@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
   const [tickets, setTickets] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null); // Stores { id, name, role }
-  const [view, setView] = useState("ACTIVE"); // "ACTIVE" or "RESOLVED"
+  const [currentUser, setCurrentUser] = useState(null);
+  const [view, setView] = useState(""); 
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -20,7 +20,6 @@ export default function Dashboard() {
 
       const headers = { Authorization: `Bearer ${token}` };
 
-      // Fetch both the user profile AND the tickets at the same time
       const [userResponse, ticketsResponse] = await Promise.all([
         axios.get("/api/users/me", { headers }),
         axios.get("/api/tickets", { headers })
@@ -28,6 +27,11 @@ export default function Dashboard() {
       
       setCurrentUser(userResponse.data);
       setTickets(ticketsResponse.data);
+      
+      // Set the default tab based on their role
+      if (!view) {
+        setView(userResponse.data.role === 'ROLE_AGENT' ? 'QUEUE' : 'ACTIVE');
+      }
     } catch (err) {
       setError("Session expired. Please log in again.");
       navigate("/");
@@ -40,7 +44,7 @@ export default function Dashboard() {
       await axios.put(`/api/tickets/${ticketId}/${action}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchData();
+      fetchData(); // Refresh the data to move the ticket to the new tab
     } catch (err) {
       alert(`Error: ${err.response?.data?.message || "Unknown error"}`);
     }
@@ -60,15 +64,29 @@ export default function Dashboard() {
     }
   };
 
-  // Filter tickets based on the current Tab (Active vs Resolved)
-  const filteredTickets = tickets.filter(t => 
-    view === "ACTIVE" ? t.status !== "RESOLVED" : t.status === "RESOLVED"
-  );
+  // 🚀 THE CORE BUSINESS LOGIC: Filter tickets based on Role AND Tab
+  const getFilteredTickets = () => {
+    if (!currentUser) return [];
+
+    if (currentUser.role === 'ROLE_USER') {
+      if (view === "ACTIVE") return tickets.filter(t => t.status !== "RESOLVED");
+      if (view === "RESOLVED") return tickets.filter(t => t.status === "RESOLVED");
+    }
+
+    if (currentUser.role === 'ROLE_AGENT') {
+      if (view === "QUEUE") return tickets.filter(t => t.status === "OPEN");
+      if (view === "WORKSPACE") return tickets.filter(t => t.status === "IN_PROGRESS" && t.assignedTo?.id === currentUser.id);
+      if (view === "TEAM") return tickets.filter(t => t.status === "IN_PROGRESS" && t.assignedTo?.id !== currentUser.id);
+      if (view === "RESOLVED") return tickets.filter(t => t.status === "RESOLVED");
+    }
+    return [];
+  };
+
+  const filteredTickets = getFilteredTickets();
 
   return (
     <div className="min-h-screen bg-gray-50">
       
-      {/* Navigation */}
       <nav className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-gray-800 tracking-tight">Synapse Command Center</h2>
@@ -88,28 +106,29 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto py-8 px-6">
         
-        {/* View Toggles (Active vs History) */}
-        <div className="flex gap-4 mb-6 border-b border-gray-200 pb-4">
-          <button 
-            onClick={() => setView("ACTIVE")}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${view === "ACTIVE" ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-100"}`}
-          >
-            Active Tickets
-          </button>
-          <button 
-            onClick={() => setView("RESOLVED")}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${view === "RESOLVED" ? "bg-gray-200 text-gray-800" : "text-gray-500 hover:bg-gray-100"}`}
-          >
-            Resolution History
-          </button>
+        {/* 🚀 DYNAMIC TABS BASED ON ROLE */}
+        <div className="flex gap-2 mb-6 border-b border-gray-200 pb-4 overflow-x-auto">
+          {currentUser?.role === 'ROLE_USER' && (
+            <>
+              <button onClick={() => setView("ACTIVE")} className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${view === "ACTIVE" ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-100"}`}>My Active Tickets</button>
+              <button onClick={() => setView("RESOLVED")} className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${view === "RESOLVED" ? "bg-gray-200 text-gray-800" : "text-gray-500 hover:bg-gray-100"}`}>Resolution History</button>
+            </>
+          )}
+
+          {currentUser?.role === 'ROLE_AGENT' && (
+            <>
+              <button onClick={() => setView("QUEUE")} className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${view === "QUEUE" ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-100"}`}>Global Queue (Open)</button>
+              <button onClick={() => setView("WORKSPACE")} className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${view === "WORKSPACE" ? "bg-emerald-100 text-emerald-800" : "text-gray-500 hover:bg-gray-100"}`}>My Workspace</button>
+              <button onClick={() => setView("TEAM")} className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${view === "TEAM" ? "bg-purple-100 text-purple-700" : "text-gray-500 hover:bg-gray-100"}`}>Team Activity</button>
+              <button onClick={() => setView("RESOLVED")} className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${view === "RESOLVED" ? "bg-gray-200 text-gray-800" : "text-gray-500 hover:bg-gray-100"}`}>History</button>
+            </>
+          )}
         </div>
 
         {error && <div className="bg-red-50 text-red-700 p-4 mb-6 rounded">{error}</div>}
 
-        {/* Ticket Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTickets.length === 0 ? (
             <div className="col-span-full text-center py-12 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
@@ -145,14 +164,15 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* ROLE-BASED UI: Only Agents see these buttons! */}
+                {/* 🚀 BUTTON SECURITY: Agents can only claim OPEN tickets */}
                 {currentUser?.role === 'ROLE_AGENT' && ticket.status === "OPEN" && (
                   <button onClick={() => handleAction(ticket.id, "assign")} className="mt-5 w-full py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-600 hover:text-white transition-colors text-sm font-medium">
                     Claim Ticket
                   </button>
                 )}
                 
-                {currentUser?.role === 'ROLE_AGENT' && ticket.status === "IN_PROGRESS" && (
+                {/* 🚀 BUTTON SECURITY: Agents can only resolve tickets ASSIGNED TO THEM */}
+                {currentUser?.role === 'ROLE_AGENT' && ticket.status === "IN_PROGRESS" && ticket.assignedTo?.id === currentUser.id && (
                   <button onClick={() => handleAction(ticket.id, "resolve")} className="mt-5 w-full py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors text-sm font-medium">
                     Mark as Resolved
                   </button>
