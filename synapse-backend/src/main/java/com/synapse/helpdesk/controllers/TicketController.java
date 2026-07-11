@@ -2,7 +2,9 @@ package com.synapse.helpdesk.controllers;
 
 import com.synapse.helpdesk.dtos.TicketRegistrationDto;
 import com.synapse.helpdesk.dtos.TicketResponseDto;
+import com.synapse.helpdesk.dtos.TicketStatsDTO;
 import com.synapse.helpdesk.models.User;
+import com.synapse.helpdesk.repositories.TicketRepository;
 import com.synapse.helpdesk.services.TicketService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import java.util.List;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final TicketRepository ticketRepository;
 
     @PostMapping
     public ResponseEntity<TicketResponseDto> createTicket(
@@ -58,5 +61,21 @@ public class TicketController {
         User loggedInAgent = (User) SecurityContextHolder
                 .getContext().getAuthentication().getPrincipal();
         return ResponseEntity.ok(ticketService.resolveTicket(id, loggedInAgent));
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAuthority('ROLE_AGENT')")
+    public ResponseEntity<?> getTicketStats() {
+
+        long total = ticketRepository.count();
+        long open = ticketRepository.countByStatus("OPEN");
+        long inProgress = ticketRepository.countByStatus("IN_PROGRESS");
+        long resolved = ticketRepository.countByStatus("RESOLVED");
+        long critical = ticketRepository.countByPriority("CRITICAL");
+
+        TicketStatsDTO stats =
+                new TicketStatsDTO(total, open, inProgress, resolved, critical);
+
+        return ResponseEntity.ok(stats);
     }
 }
