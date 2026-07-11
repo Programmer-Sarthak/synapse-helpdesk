@@ -1,4 +1,4 @@
-package com.synapse.helpdesk.models;
+package com.synapse.helpdesk.dtos;
 
 public class TicketStatsDTO {
     private long totalTickets;
