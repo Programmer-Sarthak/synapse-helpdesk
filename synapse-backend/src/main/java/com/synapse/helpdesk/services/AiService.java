@@ -1,69 +1,84 @@
 package com.synapse.helpdesk.services;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.Map;
+import java.util.List;
 
 @Service
 public class AiService {
 
-    @Value("${gemini.api.url}")
-    private String apiUrl;
-
-    @Value("${gemini.api.key}")
+    @Value("${groq.api.key}")
     private String apiKey;
 
-    private final RestClient restClient;
+    @Value("${groq.api.url}")
+    private String apiUrl;
 
-    public AiService() {
-        this.restClient = RestClient.create();
-    }
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public String determinePriority(String title, String description) {
+        String prompt = "Analyze this IT support ticket and return ONLY ONE WORD (CRITICAL, HIGH, MEDIUM, LOW) representing its urgency based on standard ITIL practices.\nTitle: " + title + "\nDescription: " + description;
+        String response = callGroqApi(prompt);
+        String upper = response.toUpperCase();
+        if (upper.contains("CRITICAL")) return "CRITICAL";
+        if (upper.contains("HIGH")) return "HIGH";
+        if (upper.contains("LOW")) return "LOW";
+        return "MEDIUM";
+    }
 
-        String prompt = "You are an IT Support AI. Analyze this ticket and respond with " +
-                "exactly ONE WORD representing its priority: LOW, MEDIUM, HIGH, or CRITICAL. \n" +
-                "Title: " + title + "\n" +
-                "Description: " + description;
+    public String generateSmartReply(String title, String description, List<String> comments) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("You are an expert IT Support Agent. Draft a professional, empathetic, and concise reply to the user to help resolve their issue or ask for necessary clarification. Do not include placeholder names or signatures, just the direct message body. Keep it under 4 sentences.\n\n");
+        prompt.append("Ticket Title: ").append(title).append("\n");
+        prompt.append("Ticket Description: ").append(description).append("\n");
 
-        Map<String, Object> requestBody = Map.of(
-                "contents", new Object[]{
-                        Map.of("parts", new Object[]{
-                                Map.of("text", prompt)
-                        })
-                }
-        );
+        if (comments != null && !comments.isEmpty()) {
+            prompt.append("Conversation History:\n");
+            for (String comment : comments) {
+                prompt.append("- ").append(comment).append("\n");
+            }
+        }
+        prompt.append("\nWrite the next response:");
 
+        return callGroqApi(prompt.toString());
+    }
+
+    private String callGroqApi(String promptText) {
         try {
-            String rawResponse = restClient.post()
-                    .uri(apiUrl + "?key=" + apiKey)
-                    .body(requestBody).retrieve()
-                    .body(String.class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(apiKey);
 
-            ObjectMapper mapper = new ObjectMapper();
+            String escapedPrompt = promptText.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
 
-            JsonNode rootNode = mapper.readTree(rawResponse);
+            String requestBody = "{"
+                    + "\"model\": \"llama-3.1-8b-instant\","
+                    + "\"messages\": [{\"role\": \"user\", \"content\": \"" + escapedPrompt + "\"}]"
+                    + "}";
 
-            String priority = rootNode
-                    .path("candidates")
-                    .get(0)
-                    .path("content")
-                    .path("parts")
-                    .get(0)
-                    .path("text")
-                    .asText();
+            HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
 
-            return priority.trim().toUpperCase();
+            String response = restTemplate.postForObject(apiUrl, request, String.class);
+            JsonNode rootNode = objectMapper.readTree(response);
 
+            return rootNode.path("choices").get(0).path("message").path("content").asText().trim();
+
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            System.err.println("\n🛑 === GROQ API ERROR ===");
+            System.err.println("Status: " + e.getStatusCode());
+            System.err.println("Message: " + e.getResponseBodyAsString());
+            System.err.println("==============================\n");
+            return "AI is busy. Please try again in a few minutes.";
         } catch (Exception e) {
-            System.err.println("AI SERVICE ERROR: " + e.getMessage());
             e.printStackTrace();
-            return "UNASSIGNED";
+            return "System error. Please try manually.";
         }
     }
 }

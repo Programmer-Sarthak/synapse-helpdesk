@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 export default function CreateTicket() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [file, setFile] = useState(null);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -15,11 +16,27 @@ export default function CreateTicket() {
     try {
       const token = localStorage.getItem("jwt_token");
       
-      await axios.post(
+      const ticketRes = await axios.post(
         "/api/tickets",
         { title, description },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      if (file) {
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        await axios.post(
+          `/api/tickets/${ticketRes.data.id}/attachments`,
+          formData,
+          { 
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data" 
+            } 
+          }
+        );
+      }
       
       navigate("/dashboard"); 
       
@@ -61,6 +78,15 @@ export default function CreateTicket() {
               onChange={(e) => setDescription(e.target.value)}
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               placeholder="Please describe the issue in detail."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Attachment (Optional)</label>
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files[0])}
+              className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
           </div>
 

@@ -4,10 +4,13 @@ import com.synapse.helpdesk.dtos.TicketRegistrationDto;
 import com.synapse.helpdesk.dtos.TicketResponseDto;
 import com.synapse.helpdesk.dtos.UserSummaryDto;
 import com.synapse.helpdesk.models.Ticket;
+import com.synapse.helpdesk.models.TicketAudit;
 import com.synapse.helpdesk.models.User;
+import com.synapse.helpdesk.repositories.TicketAuditRepository;
 import com.synapse.helpdesk.repositories.TicketRepository;
 import com.synapse.helpdesk.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -19,7 +22,10 @@ public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
     private final AiService aiService;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final TicketAuditRepository auditRepository;
 
     public TicketResponseDto createTicket(TicketRegistrationDto dto, Long userId) {
 
@@ -30,34 +36,37 @@ public class TicketService {
         ticket.setTitle(dto.getTitle());
         ticket.setDescription(dto.getDescription());
         ticket.setStatus("OPEN");
-
-        String priority = aiService.determinePriority(
-                dto.getTitle(),
-                dto.getDescription()
-        );
-        ticket.setPriority(priority);
-
+        ticket.setPriority(aiService.determinePriority(dto.getTitle(), dto.getDescription()));
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
         ticket.setCreatedBy(user);
 
         Ticket savedTicket = ticketRepository.save(ticket);
+        TicketResponseDto responseDto = mapToResponseDto(savedTicket);
 
-        return mapToResponseDto(savedTicket);
+        messagingTemplate.convertAndSend("/topic/tickets", "NEW_TICKET");
+
+        emailService.sendEmail(
+                user.getEmail(),
+                "Synapse Helpdesk - Ticket Created [#" + savedTicket.getId() + "]",
+                "Hello " + user.getName() + ",\n\nYour ticket titled '" +
+                        savedTicket.getTitle() + "' has been successfully logged into our system.\n\nAssigned Priority: " +
+                        savedTicket.getPriority() + "\n\nAn IT Support Agent will review your request shortly."
+        );
+
+        logAudit(savedTicket, "CREATED", "Ticket was opened", user.getName());
+
+        return responseDto;
     }
 
     public List<TicketResponseDto> getAllTickets(User user) {
         List<Ticket> tickets;
-
         if (user.getRole().equals("ROLE_AGENT")) {
-            tickets = ticketRepository.findAll();
+            tickets = ticketRepository.findAllByOrderByCreatedAtDesc();
         } else {
-            tickets = ticketRepository.findByCreatedBy(user);
+            tickets = ticketRepository.findByCreatedByOrderByCreatedAtDesc(user);
         }
-
-        return tickets.stream()
-                .map(this::mapToResponseDto)
-                .collect(java.util.stream.Collectors.toList());
+        return tickets.stream().map(this::mapToResponseDto).collect(java.util.stream.Collectors.toList());
     }
 
     public TicketResponseDto assignTicketToAgent(Long ticketId, User agent) {
@@ -73,7 +82,21 @@ public class TicketService {
         ticket.setStatus("IN_PROGRESS");
         ticket.setUpdatedAt(LocalDateTime.now());
 
-        return mapToResponseDto(ticketRepository.save(ticket));
+        Ticket updatedTicket = ticketRepository.save(ticket);
+
+        messagingTemplate.convertAndSend("/topic/tickets", "TICKET_UPDATED");
+
+        emailService.sendEmail(
+                updatedTicket.getCreatedBy().getEmail(),
+                "Synapse Helpdesk - Ticket Claimed [#" + updatedTicket.getId() + "]",
+                "Hello " + updatedTicket.getCreatedBy().getName() + ",\n\nYour IT issue regarding '" +
+                        updatedTicket.getTitle() + "' has been claimed by Agent " + agent.getName() +
+                        ".\n\nThe status is now: IN_PROGRESS."
+        );
+
+        logAudit(ticket, "ASSIGNED", "Ticket was claimed by agent", agent.getName());
+
+        return mapToResponseDto(updatedTicket);
     }
 
     public TicketResponseDto resolveTicket(Long ticketId, User agent) {
@@ -91,7 +114,23 @@ public class TicketService {
         ticket.setStatus("RESOLVED");
         ticket.setUpdatedAt(java.time.LocalDateTime.now());
 
-        return mapToResponseDto(ticketRepository.save(ticket));
+        Ticket updatedTicket = ticketRepository.save(ticket);
+
+        messagingTemplate.convertAndSend("/topic/tickets", "TICKET_UPDATED");
+
+        emailService.sendEmail(
+                updatedTicket.getCreatedBy().getEmail(),
+                "Synapse Helpdesk - Ticket Resolved [#" + updatedTicket.getId() + "]",
+                "Hello " + updatedTicket.getCreatedBy().getName() +
+                        ",\n\nGreat news! Your IT Support ticket concerning '" +
+                        updatedTicket.getTitle() + "' has been marked as RESOLVED by Agent " +
+                        agent.getName() +
+                        ".\n\nPlease verify that your issue is fixed. If problems persist, you may open a new ticket."
+        );
+
+        logAudit(ticket, "RESOLVED", "Ticket was marked as resolved", agent.getName());
+
+        return mapToResponseDto(updatedTicket);
     }
 
     private TicketResponseDto mapToResponseDto(Ticket ticket) {
@@ -114,7 +153,16 @@ public class TicketService {
             assigneeDto.setName(ticket.getAssignedTo().getName());
             dto.setAssignedTo(assigneeDto);
         }
-
         return dto;
+    }
+
+    private void logAudit(Ticket ticket, String action, String details, String username) {
+        TicketAudit audit = new com.synapse.helpdesk.models.TicketAudit();
+        audit.setTicket(ticket);
+        audit.setAction(action);
+        audit.setDetails(details);
+        audit.setChangedBy(username);
+        audit.setCreatedAt(java.time.LocalDateTime.now());
+        auditRepository.save(audit);
     }
 }
