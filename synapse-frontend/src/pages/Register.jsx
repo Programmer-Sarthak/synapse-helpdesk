@@ -14,7 +14,6 @@ export default function Register() {
     setError("");
 
     try {
-      // Hit your backend registration endpoint
       await axios.post("/api/users/register", {
         name,
         email,
@@ -22,7 +21,7 @@ export default function Register() {
       });
 
       alert("Registration successful! Please log in.");
-      navigate("/"); // Send them to the login page
+      navigate("/"); 
 
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed.");

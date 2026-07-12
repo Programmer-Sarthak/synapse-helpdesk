@@ -10,24 +10,15 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError("");
-    
     try {
-      const response = await axios.post("/api/users/login", {
-        email: email,
-        password: password
+      const response = await axios.post("/api/auth/login", {
+        email,
+        password
       });
-
-      const token = response.data;
-      localStorage.setItem("jwt_token", token);
+      localStorage.setItem("jwt_token", response.data);
       navigate("/dashboard");
-
     } catch (err) {
-      if (err.response && err.response.data) {
-        setError(err.response.data.message || "Invalid credentials");
-      } else {
-        setError("Server is down. Call IT!");
-      }
+      setError(err.response?.data?.message || "Invalid credentials");
     }
   };
 
@@ -47,7 +38,6 @@ export default function Login() {
         )}
         
         <form onSubmit={handleLogin} className="space-y-6">
-
           <div>
             <label className="block text-sm font-medium text-gray-700">Email Address</label>
             <input 
@@ -90,10 +80,9 @@ export default function Login() {
             E-mail: vikram.singh@synapse.in <br/>
             Password: password123 
           </span>
-      </div>
+        </div>
 
       </div>
     </div>
-    
   );
 }

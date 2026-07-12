@@ -1,13 +1,13 @@
 package com.synapse.helpdesk.dtos;
 
-public class TicketStatsDTO {
+public class TicketStatsDto {
     private long totalTickets;
     private long openTickets;
     private long inProgressTickets;
     private long resolvedTickets;
     private long criticalTickets;
 
-    public TicketStatsDTO(long totalTickets, long openTickets, long inProgressTickets, long resolvedTickets, long criticalTickets) {
+    public TicketStatsDto(long totalTickets, long openTickets, long inProgressTickets, long resolvedTickets, long criticalTickets) {
         this.totalTickets = totalTickets;
         this.openTickets = openTickets;
         this.inProgressTickets = inProgressTickets;

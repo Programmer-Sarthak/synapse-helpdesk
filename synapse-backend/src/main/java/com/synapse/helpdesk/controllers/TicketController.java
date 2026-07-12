@@ -2,7 +2,7 @@ package com.synapse.helpdesk.controllers;
 
 import com.synapse.helpdesk.dtos.TicketRegistrationDto;
 import com.synapse.helpdesk.dtos.TicketResponseDto;
-import com.synapse.helpdesk.dtos.TicketStatsDTO;
+import com.synapse.helpdesk.dtos.TicketStatsDto;
 import com.synapse.helpdesk.models.User;
 import com.synapse.helpdesk.repositories.TicketRepository;
 import com.synapse.helpdesk.services.TicketService;
@@ -64,7 +64,7 @@ public class TicketController {
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("hasAuthority('ROLE_AGENT')")
+     @PreAuthorize("hasAuthority('ROLE_AGENT')")
     public ResponseEntity<?> getTicketStats() {
 
         long total = ticketRepository.count();
@@ -73,8 +73,7 @@ public class TicketController {
         long resolved = ticketRepository.countByStatus("RESOLVED");
         long critical = ticketRepository.countByPriority("CRITICAL");
 
-        TicketStatsDTO stats =
-                new TicketStatsDTO(total, open, inProgress, resolved, critical);
+        TicketStatsDto stats = new TicketStatsDto(total, open, inProgress, resolved, critical);
 
         return ResponseEntity.ok(stats);
     }
